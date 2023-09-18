@@ -26,6 +26,8 @@ const migrateS3Data = async () => {
   };
 
   let isTruncated = true;
+  let s3Keys = [];
+  let fileKeys = [];
 
   while (isTruncated) {
     const command = new ListObjectsV2Command(input);
@@ -43,26 +45,77 @@ const migrateS3Data = async () => {
       const splitKey = wholeKey.split('qa/fifo/images/');
       const objectKey = splitKey[1];
 
-      const copyCommand = new CopyObjectCommand({
-        CopySource: `${process.env.AWS_SOURCE_BUCKET}/${wholeKey}`,
-        Bucket: process.env.AWS_DESTINATION_BUCKET,
-        Key: wholeKey,
-      });
+      // const copyCommand = new CopyObjectCommand({
+      //   CopySource: `${process.env.AWS_SOURCE_BUCKET}/${wholeKey}`,
+      //   Bucket: process.env.AWS_DESTINATION_BUCKET,
+      //   Key: wholeKey,
+      // });
 
-      await s3Client.send(copyCommand);
+      // await s3Client.send(copyCommand);
+      s3Keys.push(wholeKey);
+      console.log(`Migration to new bucket Done -> ${objectKey}`)
+    }
+  }
 
-      await fileServerDB.query(`insert into images (id, image_key, quality, privacy, client, created_at, updated_at) values ($id, $imageKey, $quality, $privacy, $client, $createdAt, $updatedAt)`, {
-        bind: {
-          id: uuidv4(),
-          imageKey: wholeKey,
-          quality: [],
-          privacy: 'public',
-          client: 'fifo',
-          createdAt: now,
-          updatedAt: now,
+  for (let i = 0; i < s3Keys.length; i++) {
+    let objectKey = s3Keys[i];
+
+    let requiredKey;
+    let requierdQuality = [];
+    let smallFlag = false;
+    let mediumFlag = false;
+    let largeFlag = false;
+
+    await modifyImageArray('small', objectKey, fileKeys, requierdQuality, requiredKey, smallFlag);
+    await modifyImageArray('medium', objectKey, fileKeys, requierdQuality, requiredKey, mediumFlag);
+    await modifyImageArray('large', objectKey, fileKeys, requierdQuality, requiredKey, largeFlag);
+  }
+
+  await Promise.all(fileKeys.map(async (filekey) => {
+    await fileServerDB.query(`insert into images (id, image_key, quality, privacy, client, created_at, updated_at) values ($id, $imageKey, $quality, $privacy, $client, $createdAt, $updatedAt)`, {
+      bind: {
+        id: uuidv4(),
+        imageKey: filekey.key,
+        quality: filekey.quality,
+        privacy: 'public',
+        client: 'fifo',
+        createdAt: now,
+        updatedAt: now,
+      }
+    })
+  }))
+
+  console.log(fileKeys)
+}
+
+
+const modifyImageArray = (fileType, objectKey, fileKeys, requierdQuality, requiredKey, flag) => {
+  if (objectKey.includes(`_${fileType}`)) {
+    if (fileKeys.length <1) {
+      requierdQuality.push(fileType)
+      requiredKey = {
+        key: objectKey.replace(`_${fileType}`, ''),
+        quality: requierdQuality
+      }
+
+      fileKeys.push(requiredKey);
+    } else {
+      for (let i = 0; i < fileKeys.length; i++) {
+        if (objectKey.replace(`_${fileType}`, '') === fileKeys[i].key) {
+          fileKeys[i].quality.push(fileType)
+          flag = true;
         }
-      })
-      console.log(`Migration Done -> ${objectKey}`)
+      }
+
+      if (!flag) {
+        requierdQuality.push(fileType)
+        requiredKey = {
+          key: objectKey.replace(`_${fileType}`, ''),
+          quality: requierdQuality
+        }
+
+        fileKeys.push(requiredKey);
+      }
     }
   }
 }
