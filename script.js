@@ -45,13 +45,13 @@ const migrateS3Data = async () => {
       const splitKey = wholeKey.split('qa/fifo/images/');
       const objectKey = splitKey[1];
 
-      // const copyCommand = new CopyObjectCommand({
-      //   CopySource: `${process.env.AWS_SOURCE_BUCKET}/${wholeKey}`,
-      //   Bucket: process.env.AWS_DESTINATION_BUCKET,
-      //   Key: wholeKey,
-      // });
+      const copyCommand = new CopyObjectCommand({
+        CopySource: `${process.env.AWS_SOURCE_BUCKET}/${wholeKey}`,
+        Bucket: process.env.AWS_DESTINATION_BUCKET,
+        Key: wholeKey,
+      });
 
-      // await s3Client.send(copyCommand);
+      await s3Client.send(copyCommand);
       s3Keys.push(wholeKey);
       console.log(`Migration to new bucket Done -> ${objectKey}`)
     }
