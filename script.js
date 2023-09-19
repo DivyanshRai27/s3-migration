@@ -65,10 +65,17 @@ const migrateS3Data = async () => {
     let smallFlag = false;
     let mediumFlag = false;
     let largeFlag = false;
+    let originalFlag = false
 
-    await modifyImageArray('small', objectKey, fileKeys, requierdQuality, requiredKey, smallFlag);
-    await modifyImageArray('medium', objectKey, fileKeys, requierdQuality, requiredKey, mediumFlag);
-    await modifyImageArray('large', objectKey, fileKeys, requierdQuality, requiredKey, largeFlag);
+    if (objectKey.includes(`_small`)) {
+      await modifyImageArray('small', objectKey, fileKeys, requierdQuality, requiredKey, smallFlag);
+    } else if (objectKey.includes(`_medium`)) {
+      await modifyImageArray('medium', objectKey, fileKeys, requierdQuality, requiredKey, mediumFlag);
+    } else if (objectKey.includes(`_large`)) {
+      await modifyImageArray('large', objectKey, fileKeys, requierdQuality, requiredKey, largeFlag);
+    } else {
+      await modifyImageArray(null, objectKey, fileKeys, requierdQuality, requiredKey, originalFlag);
+    }
   }
 
   await Promise.all(fileKeys.map(async (filekey) => {
@@ -90,32 +97,38 @@ const migrateS3Data = async () => {
 
 
 const modifyImageArray = (fileType, objectKey, fileKeys, requierdQuality, requiredKey, flag) => {
-  if (objectKey.includes(`_${fileType}`)) {
-    if (fileKeys.length <1) {
+  let qualityKey;
+
+  if (fileType) {
+    qualityKey = `_${fileType}`
+  } else {
+    qualityKey = null;
+  }
+
+  if (fileKeys.length <1) {
+    requierdQuality.push(fileType)
+    requiredKey = {
+      key: objectKey.replace(qualityKey, ''),
+      quality: requierdQuality
+    }
+
+    fileKeys.push(requiredKey);
+  } else {
+    for (let i = 0; i < fileKeys.length; i++) {
+      if (objectKey.replace(qualityKey, '') === fileKeys[i].key) {
+        fileKeys[i].quality.push(fileType)
+        flag = true;
+      }
+    }
+
+    if (!flag) {
       requierdQuality.push(fileType)
       requiredKey = {
-        key: objectKey.replace(`_${fileType}`, ''),
+        key: objectKey.replace(qualityKey, ''),
         quality: requierdQuality
       }
 
       fileKeys.push(requiredKey);
-    } else {
-      for (let i = 0; i < fileKeys.length; i++) {
-        if (objectKey.replace(`_${fileType}`, '') === fileKeys[i].key) {
-          fileKeys[i].quality.push(fileType)
-          flag = true;
-        }
-      }
-
-      if (!flag) {
-        requierdQuality.push(fileType)
-        requiredKey = {
-          key: objectKey.replace(`_${fileType}`, ''),
-          quality: requierdQuality
-        }
-
-        fileKeys.push(requiredKey);
-      }
     }
   }
 }
