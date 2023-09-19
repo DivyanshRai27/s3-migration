@@ -19,41 +19,48 @@ const migrateS3Data = async () => {
 
   let now = new Date();
 
-  const input = {
-    Bucket: process.env.AWS_SOURCE_BUCKET,
-    Prefix: 'qa/fifo/images/',
-    MaxKeys: 1000,
-  };
-
-  let isTruncated = true;
   let s3Keys = [];
   let fileKeys = [];
 
-  while (isTruncated) {
-    const command = new ListObjectsV2Command(input);
+  let path = ['qa/fifo/images/', 'qa/fifo/images/', 'cover_pics'];
 
-    const response = await s3Client.send(command);
+  for (let j = 0; j < path.length; j++) {
+    let isTruncated = true;
 
-    const contents = response.Contents;
-    console.log(`Total files: ${response.Contents.length}`);
+    const input = {
+      Bucket: process.env.AWS_SOURCE_BUCKET,
+      Prefix: path[j],
+      MaxKeys: 1000,
+    };
+  
+    while (isTruncated) {
+      const command = new ListObjectsV2Command(input);
+  
+      const response = await s3Client.send(command);
+  
+      isTruncated = response.IsTruncated;
+      command.input.ContinuationToken = response.NextContinuationToken;
 
-    isTruncated = response.IsTruncated;
-    command.input.ContinuationToken = response.NextContinuationToken;
-
-    for (let i = 0; i < contents.length; i++) {
-      const wholeKey = response.Contents[i].Key;
-      const splitKey = wholeKey.split('qa/fifo/images/');
-      const objectKey = splitKey[1];
-
-      const copyCommand = new CopyObjectCommand({
-        CopySource: `${process.env.AWS_SOURCE_BUCKET}/${wholeKey}`,
-        Bucket: process.env.AWS_DESTINATION_BUCKET,
-        Key: wholeKey,
-      });
-
-      await s3Client.send(copyCommand);
-      s3Keys.push(wholeKey);
-      console.log(`Migration to new bucket Done -> ${objectKey}`)
+      if (response.KeyCount > 0) {
+        const contents = response.Contents;
+        console.log(`Total files: ${response.Contents.length}`);
+    
+        for (let i = 0; i < contents.length; i++) {
+          const wholeKey = response.Contents[i].Key;
+          const splitKey = wholeKey.split(path[j]);
+          const objectKey = splitKey[1];
+    
+          const copyCommand = new CopyObjectCommand({
+            CopySource: `${process.env.AWS_SOURCE_BUCKET}/${wholeKey}`,
+            Bucket: process.env.AWS_DESTINATION_BUCKET,
+            Key: wholeKey,
+          });
+    
+          await s3Client.send(copyCommand);
+          s3Keys.push(wholeKey);
+          console.log(`Migration to new bucket Done -> ${objectKey}`)
+        }
+      }
     }
   }
 
