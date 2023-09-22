@@ -22,7 +22,7 @@ const migrateS3Data = async () => {
   let s3Keys = [];
   let fileKeys = [];
 
-  let path = ['qa/fifo/images/', 'qa/fifo/images/', 'cover_pics'];
+  let path = ['profile_pics/', 'cover_pics/'];
 
   for (let j = 0; j < path.length; j++) {
     let isTruncated = true;
@@ -113,7 +113,10 @@ const modifyImageArray = (fileType, objectKey, fileKeys, requierdQuality, requir
   }
 
   if (fileKeys.length <1) {
-    requierdQuality.push(fileType)
+    if (fileType) {
+      requierdQuality.push(fileType)
+    }
+
     requiredKey = {
       key: objectKey.replace(qualityKey, ''),
       quality: requierdQuality
@@ -129,7 +132,10 @@ const modifyImageArray = (fileType, objectKey, fileKeys, requierdQuality, requir
     }
 
     if (!flag) {
-      requierdQuality.push(fileType)
+      if (fileType) {
+        requierdQuality.push(fileType)
+      }
+
       requiredKey = {
         key: objectKey.replace(qualityKey, ''),
         quality: requierdQuality
