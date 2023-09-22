@@ -5,10 +5,12 @@ const {
   ListObjectsV2Command, 
   CopyObjectCommand 
  } = require('@aws-sdk/client-s3');
+ const {mapLimit} = require('awaity');
 const { v4: uuidv4 } = require('uuid');
 
 const fileServerDB = new Sequelize(process.env.FILE_SERVER_DB_NAME, process.env.DB_USERNAME, process.env.DB_PASSWORD, {
   host: process.env.DB_HOST,
+  port: process.env.DB_PORT,
   dialect: 'postgres'
 });
 
@@ -21,8 +23,12 @@ const migrateS3Data = async () => {
 
   let s3Keys = [];
   let fileKeys = [];
+  
+  let smallRE = new RegExp('small$');
+  let mediumRE = new RegExp('medium$');
+  let largeRE = new RegExp('large$');
 
-  let path = ['profile_pics/', 'cover_pics/'];
+  let path = ['profile_pics/', 'cover_pics/', 'qa/fifo/images/'];
 
   for (let j = 0; j < path.length; j++) {
     let isTruncated = true;
@@ -41,6 +47,7 @@ const migrateS3Data = async () => {
       isTruncated = response.IsTruncated;
       command.input.ContinuationToken = response.NextContinuationToken;
 
+      const promises = []
       if (response.KeyCount > 0) {
         const contents = response.Contents;
         console.log(`Total files: ${response.Contents.length}`);
@@ -56,10 +63,11 @@ const migrateS3Data = async () => {
             Key: wholeKey,
           });
     
-          await s3Client.send(copyCommand);
+          promises.push(s3Client.send(copyCommand));
           s3Keys.push(wholeKey);
           console.log(`Migration to new bucket Done -> ${objectKey}`)
         }
+        await Promise.all(promises)
       }
     }
   }
@@ -69,11 +77,11 @@ const migrateS3Data = async () => {
   for (let i = 0; i < s3Keys.length; i++) {
     let objectKey = s3Keys[i];
 
-    if (objectKey.includes(`_small`)) {
+    if (smallRE.test(objectKey)) {
       await modifyImageArray('small', objectKey, fileKeys);
-    } else if (objectKey.includes(`_medium`)) {
+    } else if (mediumRE.test(objectKey)) {
       await modifyImageArray('medium', objectKey, fileKeys);
-    } else if (objectKey.includes(`_large`)) {
+    } else if (largeRE.test(objectKey)) {
       await modifyImageArray('large', objectKey, fileKeys);
     } else {
       await modifyImageArray(null, objectKey, fileKeys);
@@ -82,8 +90,8 @@ const migrateS3Data = async () => {
 
   console.log('Saving into file server DB');
 
-  await Promise.all(fileKeys.map(async (filekey) => {
-    await fileServerDB.query(`insert into images (id, image_key, quality, privacy, client, created_at, updated_at) values ($id, $imageKey, $quality, $privacy, $client, $createdAt, $updatedAt)`, {
+  await mapLimit(fileKeys, async (filekey) => {
+    return fileServerDB.query(`insert into images (id, image_key, quality, privacy, client, created_at, updated_at) values ($id, $imageKey, $quality, $privacy, $client, $createdAt, $updatedAt)`, {
       bind: {
         id: uuidv4(),
         imageKey: filekey.key,
@@ -94,7 +102,7 @@ const migrateS3Data = async () => {
         updatedAt: now,
       }
     })
-  }))
+  }, 10)
 
   console.log('Migration Completed and saved to DB')
 }
@@ -108,7 +116,7 @@ const modifyImageArray = (fileType, objectKey, fileKeys) => {
 
 
   if (fileType) {
-    qualityKey = `_${fileType}`
+    qualityKey = `-${fileType}`
   } else {
     qualityKey = null;
   }
