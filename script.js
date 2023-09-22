@@ -64,6 +64,8 @@ const migrateS3Data = async () => {
     }
   }
 
+  console.log(`Creating Array of S3 objects : ${s3Keys.length}`);
+
   for (let i = 0; i < s3Keys.length; i++) {
     let objectKey = s3Keys[i];
 
@@ -85,6 +87,8 @@ const migrateS3Data = async () => {
     }
   }
 
+  console.log('Saving into file server DB');
+
   await Promise.all(fileKeys.map(async (filekey) => {
     await fileServerDB.query(`insert into images (id, image_key, quality, privacy, client, created_at, updated_at) values ($id, $imageKey, $quality, $privacy, $client, $createdAt, $updatedAt)`, {
       bind: {
@@ -99,7 +103,8 @@ const migrateS3Data = async () => {
     })
   }))
 
-  console.log(fileKeys)
+  console.log(fileKeys);
+  console.log('Migration Completed and saved to DB')
 }
 
 
