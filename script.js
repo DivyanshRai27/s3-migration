@@ -69,21 +69,14 @@ const migrateS3Data = async () => {
   for (let i = 0; i < s3Keys.length; i++) {
     let objectKey = s3Keys[i];
 
-    let requiredKey;
-    let requierdQuality = [];
-    let smallFlag = false;
-    let mediumFlag = false;
-    let largeFlag = false;
-    let originalFlag = false
-
     if (objectKey.includes(`_small`)) {
-      await modifyImageArray('small', objectKey, fileKeys, requierdQuality, requiredKey, smallFlag);
+      await modifyImageArray('small', objectKey, fileKeys);
     } else if (objectKey.includes(`_medium`)) {
-      await modifyImageArray('medium', objectKey, fileKeys, requierdQuality, requiredKey, mediumFlag);
+      await modifyImageArray('medium', objectKey, fileKeys);
     } else if (objectKey.includes(`_large`)) {
-      await modifyImageArray('large', objectKey, fileKeys, requierdQuality, requiredKey, largeFlag);
+      await modifyImageArray('large', objectKey, fileKeys);
     } else {
-      await modifyImageArray(null, objectKey, fileKeys, requierdQuality, requiredKey, originalFlag);
+      await modifyImageArray(null, objectKey, fileKeys);
     }
   }
 
@@ -103,13 +96,16 @@ const migrateS3Data = async () => {
     })
   }))
 
-  console.log(fileKeys);
   console.log('Migration Completed and saved to DB')
 }
 
 
-const modifyImageArray = (fileType, objectKey, fileKeys, requierdQuality, requiredKey, flag) => {
+const modifyImageArray = (fileType, objectKey, fileKeys) => {
   let qualityKey;
+  let flag = false;
+  let requiredKey;
+  let requierdQuality = [];
+
 
   if (fileType) {
     qualityKey = `_${fileType}`
