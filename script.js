@@ -28,7 +28,7 @@ const migrateS3Data = async () => {
   let mediumRE = new RegExp('medium$');
   let largeRE = new RegExp('large$');
 
-  let path = ['profile_pics/', 'cover_pics/', 'qa/fifo/images/'];
+  let path = ['profile_pics/', 'cover_pics/'];
 
   for (let j = 0; j < path.length; j++) {
     let isTruncated = true;
